@@ -5617,6 +5617,7 @@
                 redo = [],
                 sel = null,
                 io = null,
+                io2 = null,
                 saveT = 0,
                 zoomT = 0,
                 posT = 0;
@@ -5945,15 +5946,26 @@
                 scroller.replaceChildren();
                 views = [];
                 if (io) io.disconnect();
+                if (io2) io2.disconnect();
                 io = new IntersectionObserver(es => {
                     for (const e of es) {
                         const v = views[+e.target.dataset.page - 1];
                         if (!v) continue;
-                        e.isIntersecting ? mountView(v) : unmountView(v)
+                        if (e.isIntersecting) mountView(v)
                     }
                 }, {
                     root: scroller,
-                    rootMargin: '1400px 0px 1400px 0px'
+                    rootMargin: '1600px 0px 1600px 0px'
+                });
+                io2 = new IntersectionObserver(es => {
+                    for (const e of es) {
+                        const v = views[+e.target.dataset.page - 1];
+                        if (!v) continue;
+                        if (!e.isIntersecting) unmountView(v)
+                    }
+                }, {
+                    root: scroller,
+                    rootMargin: '4200px 0px 4200px 0px'
                 });
                 const frag = document.createDocumentFragment();
                 for (let n = 1; n <= pdfDoc.numPages; n++) {
@@ -5974,7 +5986,10 @@
                     frag.appendChild(w)
                 }
                 scroller.appendChild(frag);
-                views.forEach(v => io.observe(v.wrap));
+                views.forEach(v => {
+                    io.observe(v.wrap);
+                    io2.observe(v.wrap)
+                });
                 $('#nr-total').textContent = '/ ' + pdfDoc.numPages;
                 $('#nr-page').max = pdfDoc.numPages
             }
@@ -6018,6 +6033,7 @@
                 }
             }
             let active = 0;
+            const maxActive = clamp(Math.round((navigator.hardwareConcurrency || 4) / 2), 2, 4);
 
             function enqueue(v) {
                 if (!queue.includes(v)) queue.push(v);
@@ -6025,7 +6041,7 @@
             }
 
             function pump() {
-                while (active < 2 && queue.length) {
+                while (active < maxActive && queue.length) {
                     const mid = scroller.scrollTop + scroller.clientHeight / 2;
                     queue.sort((a, b) => Math.abs(a.wrap.offsetTop + a.wrap.offsetHeight / 2 - mid) - Math.abs(b.wrap.offsetTop + b.wrap.offsetHeight / 2 - mid));
                     const v = queue.shift();
@@ -8690,6 +8706,10 @@
                 if (io) {
                     io.disconnect();
                     io = null
+                }
+                if (io2) {
+                    io2.disconnect();
+                    io2 = null
                 }
                 views.forEach(v => {
                     v.tok++;
