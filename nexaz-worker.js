@@ -1,5 +1,5 @@
-const NOTIF_ICON = './assets/img/nexaz-notif-192.png?v=8';
-const NOTIF_BADGE = './assets/img/nexaz-badge-96.png?v=8';
+const NOTIF_ICON = './assets/img/nexaz-notif-192.png?v=9';
+const NOTIF_BADGE = './assets/img/nexaz-badge-96.png?v=9';
 
 function kvOp(mode, fn) {
   return new Promise((ok, no) => {
