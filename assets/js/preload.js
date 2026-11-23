@@ -1,4 +1,9 @@
         try {
+            if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+        } catch (e) {}
+
+;
+        try {
             var __s = JSON.parse(localStorage.getItem("nexa.site.v1") || "null"),
                 __d = matchMedia("(prefers-color-scheme: dark)").matches;
             document.documentElement.dataset.theme = (__s && __s.themeUser) ? (__s.theme === "dark" ? "dark" : "light") : (__d ? "dark" : "light")
