@@ -1,0 +1,33 @@
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [ main ]
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Stamp cache-busting version
+        run: |
+          SHA_SHORT=$(git rev-parse --short HEAD)
+          grep -rlE '\?v=[0-9]+' --include='*.html' --include='*.js' --include='*.webmanifest' . | xargs -r sed -i -E "s/\?v=[0-9]+/?v=${SHA_SHORT}/g"
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: '.'
+
+      - id: deployment
+        uses: actions/deploy-pages@v4
