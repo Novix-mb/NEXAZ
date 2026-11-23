@@ -14,19 +14,19 @@
   ],
   "icons": [
     {
-      "src": "assets/img/nexaz-icon-64.png?v=6",
+      "src": "assets/img/nexaz-icon-64.png?v=7",
       "sizes": "64x64",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/img/nexaz-icon-256.png?v=6",
+      "src": "assets/img/nexaz-icon-256.png?v=7",
       "sizes": "256x256",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "assets/img/nexaz-icon-512.png?v=6",
+      "src": "assets/img/nexaz-icon-512.png?v=7",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
