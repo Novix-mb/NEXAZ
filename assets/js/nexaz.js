@@ -1284,11 +1284,9 @@
                 const f = e.target.files[0];
                 if (f && !(await isPdf(f))) {
                     e.target.value = '';
-                    $('#fn').textContent = '';
                     toast(tr('Only valid PDF files are supported'));
                     return
                 }
-                $('#fn').textContent = f ? f.name : '';
                 if (f && !$('#bt').value) $('#bt').value = f.name.replace(/\.[^.]+$/, '')
             };
             const hx = h => [1, 3, 5].map(i => parseInt(String(h).slice(i, i + 2), 16) || 0);
@@ -1489,7 +1487,6 @@
                 S.books.push(b);
                 $('#bt').value = '';
                 $('#bf').value = '';
-                $('#fn').textContent = '';
                 $('#bsn').value = '';
                 $('#bsn').hidden = true;
                 SFX.add();
@@ -7802,12 +7799,15 @@
             function getWorker() {
                 if (!workerPromise) workerPromise = (async () => {
                     try {
+                        if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/js/pdf-worker.js';
                         const w = new window.pdfjsLib.PDFWorker({
                             name: 'nexa-pdf'
                         });
-                        await w.promise;
+                        const to = new Promise((_, no) => setTimeout(() => no(new Error('worker setup timed out')), 20000));
+                        await Promise.race([w.promise, to]);
                         return w
                     } catch (e) {
+                        workerPromise = null;
                         return undefined
                     }
                 })();
