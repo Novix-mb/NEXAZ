@@ -6079,12 +6079,18 @@
                     v.ink.width = Math.ceil(tmp.width * ss);
                     v.ink.height = Math.ceil(tmp.height * ss);
                     v.rs = rs * ss;
+                    v.retries = 0;
                     drawInkAll(v);
                     v.wrap.classList.add('ready')
                 } catch (err) {
                     if (err && err.name === 'RenderingCancelledException') return;
                     if (tok !== v.tok || !v.mounted) return;
-                    console.error(err)
+                    console.error(err);
+                    v.page = null;
+                    v.retries = (v.retries || 0) + 1;
+                    if (v.retries <= 3) setTimeout(() => {
+                        if (v.mounted && tok === v.tok) enqueue(v)
+                    }, 600 * v.retries)
                 }
             }
 
@@ -7795,6 +7801,8 @@
                 return window.NXSTORE.get(id, cb)
             }
             let workerPromise = null;
+            const NX_PDF_CMAPS = 'assets/vendor/pdf-cmaps/';
+            const NX_PDF_STD_FONTS = 'assets/vendor/pdf-standard-fonts/';
 
             function getWorker() {
                 if (!workerPromise) workerPromise = (async () => {
@@ -8452,6 +8460,9 @@
                             const task = this.lib.getDocument({
                                 data,
                                 isEvalSupported: false,
+                                cMapUrl: NX_PDF_CMAPS,
+                                cMapPacked: true,
+                                standardFontDataUrl: NX_PDF_STD_FONTS,
                                 worker: this.worker
                             });
                             e.doc = await task.promise;
@@ -8553,6 +8564,9 @@
                             task = lib.getDocument({
                                 data,
                                 isEvalSupported: false,
+                                cMapUrl: NX_PDF_CMAPS,
+                                cMapPacked: true,
+                                standardFontDataUrl: NX_PDF_STD_FONTS,
                                 worker
                             });
                             task.onProgress = q => {
@@ -8591,6 +8605,9 @@
                                 disableAutoFetch: true,
                                 rangeChunkSize: 1 << 20,
                                 isEvalSupported: false,
+                                cMapUrl: NX_PDF_CMAPS,
+                                cMapPacked: true,
+                                standardFontDataUrl: NX_PDF_STD_FONTS,
                                 worker
                             });
                             task.onPassword = (cb, reason) => {
