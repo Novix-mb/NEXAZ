@@ -4138,12 +4138,24 @@
 
         .rc-btn.cp-trigger {
             position: relative;
+            align-self: center;
+            flex: none;
             margin-inline-start: 0;
             margin-inline-end: 0
         }
 
+        #bkF .rc-btn.cp-trigger {
+            width: 46px;
+            height: 46px
+        }
+
         .rc-btn.cp-trigger svg {
             pointer-events: none
+        }
+
+        #bkF .rc-btn.cp-trigger svg {
+            width: 20px;
+            height: 20px
         }
 
         .rc-btn.cp-trigger input[type=color] {
