@@ -5703,6 +5703,7 @@
             let sessionBase = {
                 pages: {}
             };
+            let savedSig = '';
             const annSig = a => JSON.stringify(Object.keys((a && a.pages) || {}).sort((x, y) => x - y).filter(k => {
                 const p = a.pages[k];
                 return p && ((p.strokes && p.strokes.length) || (p.objects && p.objects.length))
@@ -5712,7 +5713,8 @@
                 ann = a && a.pages ? a : {
                     pages: {}
                 };
-                sessionBase = JSON.parse(JSON.stringify(ann))
+                sessionBase = JSON.parse(JSON.stringify(ann));
+                savedSig = annSig(ann)
             }
 
             function persist(now) {
@@ -5720,6 +5722,7 @@
                 const run = () => {
                     if (fileId == null) return true;
                     const ok = AS.set(fileId, ann);
+                    if (ok) savedSig = annSig(ann);
                     note(ok ? '' : L('Storage is full. Export your annotations before closing.', 'مساحة التخزين ممتلئة. صدّر تعليقاتك قبل الإغلاق.'));
                     return ok
                 };
@@ -8781,7 +8784,7 @@
                 const ae = document.activeElement;
                 if (ae && ae.classList && ae.classList.contains('pdf-obj-text')) ae.blur();
                 let discard = false;
-                if (fileId != null && reader.classList.contains('is-pdf') && !reader.classList.contains('nx-loading') && !reader.classList.contains('nx-failed') && annSig(ann) !== annSig(sessionBase)) {
+                if (fileId != null && reader.classList.contains('is-pdf') && !reader.classList.contains('nx-loading') && !reader.classList.contains('nx-failed') && annSig(ann) !== savedSig) {
                     const r = await threeDlg({
                         title: L('Save your changes?', 'حفظ التغييرات؟'),
                         msg: L('You have changes on this document that haven’t been saved yet.', 'لديك تعديلات على هذا المستند لم تُحفظ بعد.'),
@@ -8799,6 +8802,7 @@
                     clearTimeout(saveT);
                     AS.set(fileId, sessionBase);
                     ann = JSON.parse(JSON.stringify(sessionBase));
+                    savedSig = annSig(ann);
                     var savedPage = 0,
                         savedOk = false,
                         dropped = true
