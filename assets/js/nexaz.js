@@ -5954,7 +5954,7 @@
                     }
                 }, {
                     root: scroller,
-                    rootMargin: '1400px 0px 1400px 0px'
+                    rootMargin: '2600px 0px 2600px 0px'
                 });
                 const frag = document.createDocumentFragment();
                 for (let n = 1; n <= pdfDoc.numPages; n++) {
@@ -6026,7 +6026,7 @@
             }
 
             function pump() {
-                while (active < 2 && queue.length) {
+                while (active < 4 && queue.length) {
                     const mid = scroller.scrollTop + scroller.clientHeight / 2;
                     queue.sort((a, b) => Math.abs(a.wrap.offsetTop + a.wrap.offsetHeight / 2 - mid) - Math.abs(b.wrap.offsetTop + b.wrap.offsetHeight / 2 - mid));
                     const v = queue.shift();
@@ -6061,9 +6061,7 @@
                         v.wrap.style.setProperty('--pw', b.width);
                         v.wrap.style.setProperty('--ph', b.height)
                     }
-                    const full = pickRs(b.width, b.height),
-                        quick = !v.rs && full > scale * 1.25,
-                        rs = quick ? Math.max(.5, scale * .7) : full,
+                    const rs = pickRs(b.width, b.height),
                         vp = page.getViewport({
                             scale: rs
                         });
@@ -6085,8 +6083,7 @@
                     v.ink.height = Math.ceil(tmp.height * ss);
                     v.rs = rs * ss;
                     drawInkAll(v);
-                    v.wrap.classList.add('ready');
-                    if (quick) enqueue(v)
+                    v.wrap.classList.add('ready')
                 } catch (err) {
                     if (err && err.name === 'RenderingCancelledException') return;
                     if (tok !== v.tok || !v.mounted) return;
@@ -7800,69 +7797,21 @@
             async function getFile(id, cb) {
                 return window.NXSTORE.get(id, cb)
             }
-            let workerState = null;
-            const NX_PDF_WORKER = 'assets/js/pdf-worker.js';
+            let workerPromise = null;
 
-            function loadFakeWorker() {
-                return new Promise(res => {
-                    if (window.pdfjsWorker) {
-                        res();
-                        return
-                    }
-                    const sc = document.createElement('script');
-                    sc.src = NX_PDF_WORKER;
-                    sc.onload = sc.onerror = () => res();
-                    document.head.appendChild(sc)
-                })
-            }
-            async function getWorker() {
-                if (workerState !== null) return workerState || undefined;
-                try {
-                    let src = '';
+            function getWorker() {
+                if (!workerPromise) workerPromise = (async () => {
                     try {
-                        const r = await fetch(NX_PDF_WORKER);
-                        if (r.ok) src = await r.text()
-                    } catch (e) {}
-                    if (!src || typeof Worker === 'undefined') {
-                        await loadFakeWorker();
-                        workerState = false;
+                        const w = new window.pdfjsLib.PDFWorker({
+                            name: 'nexa-pdf'
+                        });
+                        await w.promise;
+                        return w
+                    } catch (e) {
                         return undefined
                     }
-                    const w = new Worker(URL.createObjectURL(new Blob([src], {
-                        type: 'text/javascript'
-                    })));
-                    const ok = await new Promise(res => {
-                        let done = false;
-                        w.onerror = () => {
-                            if (!done) {
-                                done = true;
-                                res(false)
-                            }
-                        };
-                        setTimeout(() => {
-                            if (!done) {
-                                done = true;
-                                res(true)
-                            }
-                        }, 60)
-                    });
-                    if (!ok) {
-                        try {
-                            w.terminate()
-                        } catch (e) {}
-                        await loadFakeWorker();
-                        workerState = false;
-                        return undefined
-                    }
-                    workerState = new window.pdfjsLib.PDFWorker({
-                        port: w
-                    });
-                    return workerState
-                } catch (e) {
-                    await loadFakeWorker();
-                    workerState = false;
-                    return undefined
-                }
+                })();
+                return workerPromise
             }
             setTimeout(() => {
                 if (window.pdfjsLib) getWorker()
