@@ -1,4 +1,4 @@
-<!doctype html>
+ <!doctype html>
 <html lang="en" dir="ltr">
 <head>
     <meta charset="utf-8">
@@ -204,9 +204,7 @@
 
             <section class="view" id="v-library"><h1 class="pg" data-t>Library</h1>
                 <div class="card">
-                    <form class="form" id="bkF"><input id="bt" required maxlength="80" data-ph="Book title" placeholder="Book title" aria-label="Book title"><select id="bs" aria-label="Subject"></select><input id="bsn" hidden maxlength="24" data-ph="New subject" placeholder="New subject" aria-label="New subject"><label class="btn ghost" style="cursor:pointer"><span data-t>Choose PDF</span><input id="bf" type="file" hidden accept=".pdf,application/pdf"></label><span id="fn" style="color:var(--muted);font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span><button class="btn" type="submit"><span data-t>Add book</span></button>
-                        <div class="cover-pick"><span class="cp-lab" data-t>Cover colour</span><span class="cp-sw" id="cpSw"></span></div>
-                    </form>
+                    <form class="form" id="bkF"><span class="bt-row"><input id="bt" required maxlength="80" data-ph="Book title" placeholder="Book title" aria-label="Book title"><span class="cover-pick" id="cpSw"><input type="color" id="cpCustom" class="cp-input" value="#2e6fa5" title="Custom colour" aria-label="Custom colour"><button type="button" id="cpFirst" class="cp-first-btn" title="Use first page as cover" aria-label="Use first page as cover"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/></svg></button></span></span><select id="bs" aria-label="Subject"></select><input id="bsn" hidden maxlength="24" data-ph="New subject" placeholder="New subject" aria-label="New subject"><label class="btn ghost" style="cursor:pointer"><span data-t>Choose PDF</span><input id="bf" type="file" hidden accept=".pdf,application/pdf"></label><span id="fn" style="color:var(--muted);font-size:13px;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></span><button class="btn" type="submit"><span data-t>Add book</span></button></form>
                 </div>
                 <div class="chips" id="subj"></div>
                 <div class="grid" id="lib"></div>
