@@ -1069,14 +1069,6 @@
             pointer-events: none
         }
 
-        .cover.has-cover {
-            background-color: #2b3a3a
-        }
-
-        .cover.has-cover::after {
-            background: linear-gradient(180deg, rgba(0, 0, 0, .55) 0%, rgba(0, 0, 0, .12) 35%, rgba(0, 0, 0, .12) 60%, rgba(0, 0, 0, .6) 100%)
-        }
-
         .bt {
             font-family: "Playfair Display", Alexandria, Georgia, serif;
             font-weight: 700;
@@ -3688,7 +3680,7 @@
             overflow: visible
         }
 
-        #nexa-pdf-reader .pdf-page::before {
+        #nexa-pdf-reader .pdf-page:not(.ready)::before {
             content: attr(data-page);
             position: absolute;
             inset: 0;
@@ -3696,13 +3688,7 @@
             place-items: center;
             font: 700 clamp(18px, 4vw, 32px) Manrope, sans-serif;
             color: #c5d2cc;
-            pointer-events: none;
-            opacity: 1;
-            transition: opacity .2s ease
-        }
-
-        #nexa-pdf-reader .pdf-page.ready::before {
-            opacity: 0
+            pointer-events: none
         }
 
         #nexa-pdf-reader .pdf-base,
@@ -3713,15 +3699,6 @@
             width: 100%;
             height: 100%;
             display: block
-        }
-
-        #nexa-pdf-reader .pdf-base {
-            opacity: 0;
-            transition: opacity .2s ease
-        }
-
-        #nexa-pdf-reader .pdf-page.ready .pdf-base {
-            opacity: 1
         }
 
         #nexa-pdf-reader .pdf-ink {
@@ -4089,7 +4066,7 @@
             border-color: #344b3f
         }
 
-        #nexa-pdf-reader[data-theme=dark] .pdf-page::before {
+        #nexa-pdf-reader[data-theme=dark] .pdf-page:not(.ready)::before {
             color: #566a61
         }
 
@@ -4159,62 +4136,31 @@
             box-shadow: 0 0 0 1.5px #20322b, inset 0 0 0 1px rgba(0, 0, 0, .2)
         }
 
-        .bt-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            flex: 1 1 220px;
-            min-width: 220px
+        .rc-btn.cp-trigger {
+            position: relative;
+            margin-inline-start: 0;
+            margin-inline-end: 0
         }
 
-        .bt-row input#bt {
-            flex: 1;
-            min-width: 120px
+        .rc-btn.cp-trigger svg {
+            pointer-events: none
         }
 
-        .cover-pick {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            flex: none
-        }
-
-        .cp-first-btn {
-            width: 30px;
-            height: 30px;
-            border-radius: 50%;
-            border: 1px solid var(--line);
-            background: var(--bg2);
-            color: var(--muted);
-            display: grid;
-            place-items: center;
+        .rc-btn.cp-trigger input[type=color] {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            min-width: 0;
+            margin: 0;
             padding: 0;
+            border: 0;
+            opacity: 0;
             cursor: pointer;
-            flex: none;
-            transition: transform .12s, color .15s, border-color .15s
+            -webkit-appearance: none;
+            appearance: none
         }
 
-        .cp-first-btn svg {
-            width: 16px;
-            height: 16px
-        }
-
-        .cp-first-btn:hover {
-            transform: scale(1.1)
-        }
-
-        .cp-first-btn.on {
-            color: #4f8fe8;
-            border-color: #4f8fe8
-        }
-
-        .cp-lab {
-            font-size: 12px;
-            font-weight: 700;
-            color: var(--muted)
-        }
-
-        .cp-sw,
         .recolor-pop {
             display: inline-flex;
             align-items: center;
