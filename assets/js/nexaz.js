@@ -185,6 +185,7 @@
                 'Cover colour': 'لون الغلاف',
                 'Auto': 'تلقائي',
                 'Custom colour': 'لون مخصص',
+                'Use first page as cover': 'استخدم الصفحة الأولى غلافًا',
                 'Saving…': 'جارٍ الحفظ…',
                 'Choose PDF': 'اختر ملف PDF',
                 'Please choose a PDF file': 'من فضلك اختر ملف PDF أولًا',
@@ -490,8 +491,8 @@
                 });
                 const bk = S.books.filter(b => (subj === 'All' || b.s === subj) && (!qv || b.t.toLowerCase().includes(qv)));
                 $('#lib').innerHTML = bk.map(b => {
-                    const c = coverGrad(b);
-                    return `<div class="book"><button class="cover" data-open="${b.id}" style="--c1:${c[0]};--c2:${c[1]}" aria-label="${esc(b.t)}"><span class="bt">${esc(b.t)}</span><span class="bs">${esc(tr(b.s))}</span></button><div class="bm"><span>${b.ty?esc(b.ty)+' · '+fmt(b.size):'—'}</span><button class="rc-btn" data-recolor="${b.id}" title="${tr('Cover colour')}" aria-label="${tr('Cover colour')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.8-.4-1.1-.3-.4-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8.5-9-8.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg></button>${b.fn?`<button class="open-btn" data-open="${b.id}">${tr('Open')}</button>`:''}<button class="x" data-bdel="${b.id}" aria-label="${tr('Delete')}">${ic('x')}</button></div></div>`
+                    const cv = coverAttrs(b);
+                    return `<div class="book"><button class="cover${cv.cls}" data-open="${b.id}" style="${cv.style}" aria-label="${esc(b.t)}"><span class="bt">${esc(b.t)}</span><span class="bs">${esc(tr(b.s))}</span></button><div class="bm"><span>${b.ty?esc(b.ty)+' · '+fmt(b.size):'—'}</span><button class="rc-btn" data-recolor="${b.id}" title="${tr('Cover colour')}" aria-label="${tr('Cover colour')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a9 9 0 1 0 0 18c1.1 0 1.8-.8 1.8-1.7 0-.5-.2-.8-.4-1.1-.3-.4-.4-.7-.4-1.1 0-.9.7-1.6 1.6-1.6H17a4 4 0 0 0 4-4c0-4.4-4-8.5-9-8.5z"/><circle cx="7.5" cy="11" r="1"/><circle cx="10.5" cy="7" r="1"/><circle cx="15" cy="7.5" r="1"/></svg></button>${b.fn?`<button class="open-btn" data-open="${b.id}">${tr('Open')}</button>`:''}<button class="x" data-bdel="${b.id}" aria-label="${tr('Delete')}">${ic('x')}</button></div></div>`
                 }).join('') || `<p class="empty">${tr('Your library is empty. Add your first book above.')}</p>`;
                 {
                     const bs = $('#bs'),
@@ -1280,6 +1281,39 @@
                 } catch (x) {}
                 return false
             };
+            async function firstPageCover(f) {
+                if (window.NXLAZY) await window.NXLAZY.pdf().catch(() => {});
+                const lib = window.pdfjsLib;
+                if (!lib) return null;
+                const data = new Uint8Array(await f.arrayBuffer()),
+                    doc = await lib.getDocument({
+                        data,
+                        isEvalSupported: false
+                    }).promise;
+                try {
+                    const page = await doc.getPage(1),
+                        vp0 = page.getViewport({
+                            scale: 1
+                        }),
+                        w = 240,
+                        s = w / vp0.width,
+                        vp = page.getViewport({
+                            scale: s
+                        }),
+                        c = document.createElement('canvas');
+                    c.width = Math.ceil(vp.width);
+                    c.height = Math.ceil(vp.height);
+                    await page.render({
+                        canvasContext: c.getContext('2d'),
+                        viewport: vp
+                    }).promise;
+                    return c.toDataURL('image/jpeg', .75)
+                } finally {
+                    try {
+                        doc.destroy()
+                    } catch (x) {}
+                }
+            }
             $('#bf').onchange = async e => {
                 const f = e.target.files[0];
                 if (f && !(await isPdf(f))) {
@@ -1309,6 +1343,18 @@
                     return [base, mixc(base, '#ffffff', .36)]
                 }
                 return PAL[b.c % PAL.length]
+            }
+
+            function coverAttrs(b) {
+                if (b.cv) return {
+                    cls: ' has-cover',
+                    style: `background-image:url(${b.cv});background-size:cover;background-position:center`
+                };
+                const c = coverGrad(b);
+                return {
+                    cls: '',
+                    style: `--c1:${c[0]};--c2:${c[1]}`
+                }
             }
 
             function paintPick(box, cur, onPick) {
@@ -1384,12 +1430,42 @@
             }
             window.NX_confirm = confirmDlg;
             window.__coverPick = null;
-            const cpBox = $('#cpSw');
-            const repaintPick = () => paintPick(cpBox, window.__coverPick, (c, live) => {
-                window.__coverPick = c;
-                if (!live) repaintPick()
-            });
-            repaintPick();
+            window.__coverImg = null;
+            const cpCustom = $('#cpCustom'),
+                cpFirst = $('#cpFirst');
+            const syncCoverUI = () => {
+                cpFirst.classList.toggle('on', !!window.__coverImg);
+                if (window.__coverPick) cpCustom.value = window.__coverPick
+            };
+            cpCustom.oninput = () => {
+                window.__coverPick = cpCustom.value;
+                window.__coverImg = null;
+                syncCoverUI()
+            };
+            cpFirst.onclick = async () => {
+                if (window.__coverImg) {
+                    window.__coverImg = null;
+                    syncCoverUI();
+                    return
+                }
+                const f = $('#bf').files[0];
+                if (!f || !(await isPdf(f))) {
+                    toast(tr('Please choose a PDF file'));
+                    return
+                }
+                cpFirst.disabled = true;
+                try {
+                    const img = await firstPageCover(f);
+                    if (img) {
+                        window.__coverImg = img;
+                        window.__coverPick = null
+                    }
+                } catch (x) {} finally {
+                    cpFirst.disabled = false;
+                    syncCoverUI()
+                }
+            };
+            syncCoverUI();
             const recolorPop = document.createElement('div');
             recolorPop.className = 'recolor-pop';
             recolorPop.hidden = true;
@@ -1413,6 +1489,7 @@
                 recolorId = id;
                 paintPick(recolorPop, b.cc || null, (c, live) => {
                     b.cc = c || undefined;
+                    b.cv = undefined;
                     save();
                     render();
                     if (!live) closePop()
@@ -1459,6 +1536,7 @@
                         fn: f ? f.name : '',
                         ty: 'PDF',
                         cc: window.__coverPick || undefined,
+                        cv: window.__coverImg || undefined,
                         size: f ? f.size : 0
                     };
                 let mem = false;
@@ -1501,7 +1579,9 @@
                 render();
                 $('#bs').value = s;
                 window.__coverPick = null;
-                repaintPick();
+                window.__coverImg = null;
+                cpCustom.value = '#2e6fa5';
+                syncCoverUI();
                 setTimeout(() => {
                     const o = document.querySelector('[data-open="' + b.id + '"]');
                     if (o) {
@@ -5439,8 +5519,8 @@
                     K = $('#hmTasks');
                 if (!B || !K) return;
                 B.innerHTML = S.books.slice(-4).reverse().map(b => {
-                    const c = coverGrad(b);
-                    return `<div class="hm-b"><button class="cover" data-hopen="${b.id}" style="--c1:${c[0]};--c2:${c[1]}" aria-label="${esc(b.t)}"><span class="bt">${esc(b.t)}</span><span class="bs">${esc(tr(b.s))}</span></button><b class="hm-bn" title="${esc(b.t)}">${esc(b.t)}</b><span class="hm-chip">${esc(b.ty||'PDF')}</span></div>`
+                    const cv = coverAttrs(b);
+                    return `<div class="hm-b"><button class="cover${cv.cls}" data-hopen="${b.id}" style="${cv.style}" aria-label="${esc(b.t)}"><span class="bt">${esc(b.t)}</span><span class="bs">${esc(tr(b.s))}</span></button><b class="hm-bn" title="${esc(b.t)}">${esc(b.t)}</b><span class="hm-chip">${esc(b.ty||'PDF')}</span></div>`
                 }).join('') || `<p class="hm-empty">${tr('Your library is empty. Add your first book above.')}</p>`;
                 const ts = S.tasks.slice().sort((a, b) => (!!a.d - !!b.d) || tSort(a, b)).slice(0, 4);
                 K.innerHTML = ts.map(x => `<div class="hm-t ${x.d?'done':''}"><button class="hm-chk" data-hid="${x.id}" role="checkbox" aria-checked="${!!x.d}" aria-label="${esc(tr(x.t))}">${ic('ck')}</button><span class="hm-tt"><b>${esc(tr(x.t))}</b><small>${tr(DIFF[x.p]||x.p)}</small></span>${x.d?`<span class="hm-ok">${tr('Completed')}</span>`:`<span class="hm-when"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>${tr('Today')}</span>`}</div>`).join('') || `<p class="hm-empty">${tr('No tasks yet. Add your first task above.')}</p>`;
@@ -6076,9 +6156,7 @@
                         v.wrap.style.setProperty('--pw', b.width);
                         v.wrap.style.setProperty('--ph', b.height)
                     }
-                    const full = pickRs(b.width, b.height),
-                        quick = !v.rs && full > scale * 1.25,
-                        rs = quick ? Math.max(.5, scale * .7) : full,
+                    const rs = pickRs(b.width, b.height),
                         vp = page.getViewport({
                             scale: rs
                         });
@@ -6100,8 +6178,7 @@
                     v.ink.height = Math.ceil(tmp.height * ss);
                     v.rs = rs * ss;
                     drawInkAll(v);
-                    v.wrap.classList.add('ready');
-                    if (quick) enqueue(v)
+                    v.wrap.classList.add('ready')
                 } catch (err) {
                     if (err && err.name === 'RenderingCancelledException') return;
                     if (tok !== v.tok || !v.mounted) return;
@@ -6132,6 +6209,27 @@
             function fitWidth() {
                 const avail = Math.max(240, scroller.clientWidth - 24);
                 return clamp(avail / defW, .4, 2)
+            }
+
+            function setScaleAt(ns, clientX, clientY) {
+                ns = clamp(ns, .4, 4);
+                if (Math.abs(ns - scale) < .002) return;
+                const r = scroller.getBoundingClientRect(),
+                    ox = clientX - r.left,
+                    oy = clientY - r.top,
+                    cx = scroller.scrollLeft + ox,
+                    cy = scroller.scrollTop + oy,
+                    k = ns / scale;
+                scale = ns;
+                scroller.style.setProperty('--s', scale);
+                scroller.scrollLeft = cx * k - ox;
+                scroller.scrollTop = cy * k - oy;
+                updZoomLabel();
+                clearTimeout(zoomT);
+                zoomT = setTimeout(() => {
+                    views.forEach(v => v.mounted && enqueue(v));
+                    savePos()
+                }, 160)
             }
 
             function scrollToPage(n) {
@@ -6946,12 +7044,16 @@
                         };
                         if (dbl) {
                             const hit = hitStroke(v, x, y);
+                            lastTap = null;
+                            e.preventDefault();
                             if (hit) {
-                                lastTap = null;
-                                e.preventDefault();
                                 selectStroke(v, hit);
                                 return
                             }
+                            const base = fitWidth(),
+                                ns = scale < base * 1.3 ? clamp(base * 2.2, 1, 4) : base;
+                            setScaleAt(ns, e.clientX, e.clientY);
+                            return
                         }
                         clearStrokeSel();
                         clearSel();
