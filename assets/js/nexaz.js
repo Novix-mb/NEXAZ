@@ -9068,14 +9068,30 @@
                         } else {
                             buildViews();
                             setTool('pan');
-                            reader.classList.remove('nx-loading');
                             if (pos && pos.page > 1) scrollToPage(pos.page);
                             else {
                                 scroller.scrollTop = 0;
                                 $('#nr-page').value = 1
                             }
                             updCurPage();
-                            for (let k = Math.max(0, curPage - 1); k < Math.min(views.length, curPage + 1); k++) mountView(views[k]);
+                            const firstViews = [];
+                            for (let k = Math.max(0, curPage - 1); k < Math.min(views.length, curPage + 1); k++) {
+                                mountView(views[k]);
+                                firstViews.push(views[k])
+                            }
+                            await Promise.all(firstViews.map(v => new Promise(res => {
+                                const t0 = Date.now();
+                                const tick = () => {
+                                    if (myTok !== openTok || v.wrap.classList.contains('ready') || Date.now() - t0 > 20000) {
+                                        res();
+                                        return
+                                    }
+                                    requestAnimationFrame(tick)
+                                };
+                                tick()
+                            })));
+                            if (myTok !== openTok) return;
+                            reader.classList.remove('nx-loading');
                             note('')
                         }
                     } else {
@@ -10237,4 +10253,3 @@
                 lockOff()
             })
         })();
-
