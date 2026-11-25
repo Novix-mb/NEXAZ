@@ -152,10 +152,13 @@ W.GN=function(root,o){
   els.forEach(d=>io.observe(d));els.forEach((d,k)=>d.classList.toggle('solo',k===cur));size();$('.tot').textContent='/ '+P.length;thumbs()}
  function size(){P.forEach((p,i)=>{els[i].style.width=p.w*st.z+'px';els[i].style.height=p.h*st.z+'px'});$('[data-a=zr]').textContent=Math.round(st.z*100)+'%'}
  const dpr=()=>Math.min(W.devicePixelRatio||1,2);
+ const bsOk={},bsTok={};
  function mount(i){const d=els[i];if(!d)return;const bs=d.querySelector('.gbs'),ik=d.querySelector('.ik'),lv=d.querySelector('.lv');let w=Math.round(P[i].w*st.z*dpr()),h=Math.round(P[i].h*st.z*dpr());if(o.maxPx&&w*h>o.maxPx){const k=Math.sqrt(o.maxPx/(w*h));w=Math.round(w*k);h=Math.round(h*k)}
-  const key=w+'x'+h;if(mounted[i]===key)return;mounted[i]=key;[bs,ik,lv].forEach(c=>{c.width=w;c.height=h});
-  const p=o.base&&o.base(i,bs,w,P[i]);redraw(i);if(p&&p.catch)p.catch(()=>{})}
- function unmount(i){if(!mounted[i])return;delete mounted[i];els[i].querySelectorAll('canvas').forEach(c=>{c.width=1;c.height=1})}
+  const key=w+'x'+h;if(mounted[i]===key)return;mounted[i]=key;const tk=bsTok[i]=(bsTok[i]||0)+1;[ik,lv].forEach(c=>{c.width=w;c.height=h});
+  let tg=bs,sw=false;if(bsOk[i]&&bs.width>1){tg=document.createElement('canvas');tg.width=w;tg.height=h;sw=true}else{bs.width=w;bs.height=h}
+  const fin=()=>{if(mounted[i]!==key||bsTok[i]!==tk)return;if(sw){bs.width=w;bs.height=h;bs.getContext('2d').drawImage(tg,0,0)}bsOk[i]=1};
+  const p=o.base&&o.base(i,tg,w,P[i]);redraw(i);if(p&&p.then)p.then(fin,()=>{});else fin()}
+ function unmount(i){if(!mounted[i])return;delete mounted[i];bsOk[i]=0;bsTok[i]=(bsTok[i]||0)+1;els[i].querySelectorAll('canvas').forEach(c=>{c.width=1;c.height=1})}
  function redraw(i){const d=els[i];if(!d||!mounted[i])return;const c=d.querySelector('.ik'),x=c.getContext('2d');x.clearRect(0,0,c.width,c.height);const s=c.width/P[i].w;for(const it of items[i])dr(x,it,s);live(i);if(thT[i]===undefined)thT[i]=setTimeout(()=>{delete thT[i];th1(i)},250)}
  W.addEventListener('gn-img',()=>{for(const i in mounted)redraw(+i)});
 
@@ -252,9 +255,10 @@ W.GN=function(root,o){
  ta.onblur=e=>{if(cp||(e.relatedTarget&&tb.contains(e.relatedTarget)))return;fin()};ta.onkeydown=e=>{if(e.key==='Escape')ta.blur()};d.appendChild(tb);d.appendChild(ta);curTa=ta;fit();setTimeout(()=>{ta.focus();fit()},30)}
 
  const ptrs=new Map();let pd=0,lm=null,twoF=0;
- let dtap=null;
+ let dtap=null,dzAt=0;
+ function dblZoom(cx,cy){const fz=Math.max(.3,Math.min(3,(sc.clientWidth-(W.innerWidth<700?16:48))/Math.max(...P.map(p=>p.w))));const nz=st.z>fz*1.35?fz:Math.min(5,Math.max(st.z*2,fz*2));const R=sc.getBoundingClientRect(),px=cx-R.left,py=cy-R.top,ax=(sc.scrollLeft+px)/sc.scrollWidth,ay=(sc.scrollTop+py)/sc.scrollHeight;dzAt=Date.now();setZ(nz);sc.scrollLeft=ax*sc.scrollWidth-px;sc.scrollTop=ay*sc.scrollHeight-py}
  function pickAt(cx,cy){for(let i=0;i<P.length;i++){const d=els[i];if(!d)continue;const r0=d.getBoundingClientRect();if(cx<r0.left||cx>r0.right||cy<r0.top||cy>r0.bottom)continue;const x=(cx-r0.left)/r0.width*P[i].w,y=(cy-r0.top)/r0.height*P[i].h,tol=8/st.z;for(let k=items[i].length-1;k>=0;k--){const it=items[i][k];if(it.t!=='er'&&hit(it,x,y,tol)){sel={i,ids:[it],free:1};cur=i;live(i);return}}}}
- sc.addEventListener('pointerdown',e=>{if(st.tool!=='hand'||e.button>0||e.target.closest('.gn-sel,.gn-tt,textarea'))return;if(e.pointerType!=='pen'&&(e.pointerType!=='touch'||ptrs.size===0)&&!(e.target.classList&&e.target.classList.contains('lv'))&&!(e.pointerType==='touch'&&st.view!=='one'&&!sel))panStart(e);const n=Date.now();if(dtap&&n-dtap.t<380&&Math.hypot(e.clientX-dtap.x,e.clientY-dtap.y)<26){dtap=null;clearTimeout(tapTimer);pickAt(e.clientX,e.clientY)}else dtap={t:n,x:e.clientX,y:e.clientY}},true);
+ sc.addEventListener('pointerdown',e=>{if(st.tool!=='hand'||e.button>0||e.target.closest('.gn-sel,.gn-tt,textarea'))return;if(e.pointerType!=='pen'&&(e.pointerType!=='touch'||ptrs.size===0)&&!(e.target.classList&&e.target.classList.contains('lv'))&&!(e.pointerType==='touch'&&st.view!=='one'&&!sel))panStart(e);const n=Date.now();if(dtap&&n-dtap.t<380&&Math.hypot(e.clientX-dtap.x,e.clientY-dtap.y)<26){dtap=null;clearTimeout(tapTimer);const s0=sel;pickAt(e.clientX,e.clientY);if(!sel&&!s0)dblZoom(e.clientX,e.clientY)}else dtap={t:n,x:e.clientX,y:e.clientY}},true);
  sc.addEventListener('pointerdown',e=>{if(e.pointerType!=='touch')return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);if(ptrs.size===1)twoF=0;if(ptrs.size===2){twoF=1;pan=null;if(fl)flipEnd(fl.dx||0);const li=L?L.i:cur;if(L&&L.k==='e'&&!L.it){const q=u.pop();if(q&&L.ch){items[q.i]=q.a;redraw(q.i)}hb()}L=null;ls=null;if(sel){delete sel.drag;delete sel.tmp}redraw(li);pd=dist();lm=null;live(cur)}},true);
  sc.addEventListener('pointermove',e=>{if(!ptrs.has(e.pointerId))return;ptrs.set(e.pointerId,[e.clientX,e.clientY]);if(ptrs.size===2&&pd){const d=dist(),a=[...ptrs.values()],mx=(a[0][0]+a[1][0])/2,my=(a[0][1]+a[1][1])/2;if(lm){sc.scrollLeft-=mx-lm[0];sc.scrollTop-=my-lm[1]}lm=[mx,my];setZ(st.z*d/pd,1);pd=d}},true);
  const pu=e=>{ptrs.delete(e.pointerId);if(ptrs.size<2){pd=0;lm=null}};sc.addEventListener('pointerup',pu,true);sc.addEventListener('pointercancel',pu,true);
@@ -308,7 +312,7 @@ W.GN=function(root,o){
   if(!pan.m){if(Math.hypot(pan.dx,pan.dy)<8)return;pan.m=(st.view==='one'&&!zoomOver()&&Math.abs(pan.dx)>Math.abs(pan.dy))?'flip':'pan'}
   if(pan.m==='flip')flipMove(pan.dx);else{sc.scrollLeft=pan.sl-pan.dx;if(!lockV())sc.scrollTop=pan.st-pan.dy}
   e.preventDefault()},{passive:false});
- function panEnd(e){if(!pan||(e&&e.pointerId!==pan.id))return;const p=pan;pan=null;sc.classList.remove('panning');if(p.m==='flip')flipEnd(p.dx);else if(p.m==='pan'&&p.h.length>1)startInertia(p);else if(p.m===null&&e&&e.type==='pointerup'&&st.view==='one'&&st.tool==='hand'&&Date.now()-p.t0<400){const R=sc.getBoundingClientRect(),fx=(p.x-R.left)/R.width;if(fx>.6||fx<.4){clearTimeout(tapTimer);tapTimer=setTimeout(()=>{if(sel||st.view!=='one')return;slideEnd();goto(fx>.6?Math.min(P.length-1,cur+1):Math.max(0,cur-1))},300)}}}
+ function panEnd(e){if(!pan||(e&&e.pointerId!==pan.id))return;const p=pan;pan=null;sc.classList.remove('panning');if(p.m==='flip')flipEnd(p.dx);else if(p.m==='pan'&&p.h.length>1)startInertia(p);else if(p.m===null&&e&&e.type==='pointerup'&&st.view==='one'&&st.tool==='hand'&&Date.now()-p.t0<400){const R=sc.getBoundingClientRect(),fx=(p.x-R.left)/R.width;if(fx>.6||fx<.4){clearTimeout(tapTimer);tapTimer=setTimeout(()=>{if(sel||st.view!=='one'||Date.now()-dzAt<700)return;slideEnd();goto(fx>.6?Math.min(P.length-1,cur+1):Math.max(0,cur-1))},300)}}}
  W.addEventListener('pointerup',panEnd);W.addEventListener('pointercancel',panEnd);
  sc.addEventListener('scroll',()=>{if(st.view==='one')return;const m=sc.scrollTop+sc.clientHeight*.4;let c=0;for(let i=0;i<els.length;i++)if(els[i].offsetTop<=m)c=i;if(c!==cur||pill.dataset.c===undefined){cur=c;pill.value=c+1;pill.dataset.c=c;side.querySelectorAll('.gn-th').forEach((a,k)=>a.classList.toggle('cur',k===c))}},{passive:true});
  function lockV(){return st.view==='one'&&!!els[cur]&&els[cur].offsetHeight<=sc.clientHeight-2}

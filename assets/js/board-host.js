@@ -119,15 +119,16 @@ function paper(i,cv,w,p,fl){var x=cv.getContext('2d'),s=w/p.w,h=cv.height,W=cv.w
 
   var pdf = null;
   var cancels = new WeakMap();
-  function pdfBaseFor(doc) {
-    return function (i, cv, w, p) {
-      var prev = cancels.get(cv); if (prev) { try { prev.cancel(); } catch (e) {} }
+  function pdfBaseFor(doc, onDone) {
+    var tasks = {};
+    return function (i, cv, w, p, m) {
+      if (!m) { var prev = tasks[i]; if (prev) { try { prev.cancel(); } catch (e) {} } }
       return doc.getPage(p.pdf).then(function (pg) {
         var v1 = pg.getViewport({ scale: 1 });
         var vp = pg.getViewport({ scale: cv.width / v1.width });
         var x = cv.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, cv.width, cv.height);
-        var t = pg.render({ canvasContext: x, viewport: vp }); cancels.set(cv, t);
-        return t.promise;
+        var t = pg.render({ canvasContext: x, viewport: vp }); if (!m) tasks[i] = t;
+        return t.promise.then(function () { if (!m && onDone) onDone(i); });
       });
     };
   }
@@ -147,6 +148,7 @@ function paper(i,cv,w,p,fl){var x=cv.getContext('2d'),s=w/p.w,h=cv.height,W=cv.w
     await load();
     if (pdf) closePdf();
     var doc = o.doc, sizes = await pageSizes(doc, o.onProgress);
+    var firstRes, firstP = new Promise(function (r) { firstRes = r; }), firstIdx = o.startPage > 1 ? o.startPage - 1 : 0;
     var saved = await kvGet('pdf:' + o.fileId), n = sizes.length;
     var items = [];
     for (var i = 0; i < n; i++) items.push(saved && saved.items && Array.isArray(saved.items[i]) ? saved.items[i] : []);
@@ -156,7 +158,7 @@ function paper(i,cv,w,p,fl){var x=cv.getContext('2d'),s=w/p.w,h=cv.height,W=cv.w
     var key = 'pdf:' + o.fileId;
     var g = W.GN(root, {
       lang: isAr() ? 'ar' : 'en', title: o.title || '', pages: pages, items: items, fixed: 1, maxPx: 16e6,
-      base: pdfBaseFor(doc), exportName: (o.title || 'document').replace(/\.pdf$/i, '').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60),
+      base: pdfBaseFor(doc, function (pi) { if (pi === firstIdx) firstRes(); }), exportName: (o.title || 'document').replace(/\.pdf$/i, '').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60),
       save: function (it) { kvSet(key, { items: it, n: n }); },
       onBack: function () { o.onBack && o.onBack(); },
       onFs: function () { elFs(host); }
@@ -167,6 +169,7 @@ function paper(i,cv,w,p,fl){var x=cv.getContext('2d'),s=w/p.w,h=cv.height,W=cv.w
       g.fit();
       if (o.startPage > 1) g.goPage(o.startPage - 1);
     }, 60);
+    await Promise.race([firstP, new Promise(function (r) { setTimeout(r, 15000); })]);
     return g;
   }
   function closePdf() {
