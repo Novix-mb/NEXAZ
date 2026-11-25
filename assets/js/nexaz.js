@@ -7801,14 +7801,76 @@
                 return window.NXSTORE.get(id, cb)
             }
             let workerPromise = null;
+            let workerHandler = null;
             const NX_PDF_CMAPS = 'assets/vendor/pdf-cmaps/';
             const NX_PDF_STD_FONTS = 'assets/vendor/pdf-standard-fonts/';
+            const NX_WORKER_SRC = 'assets/js/pdf-worker.js';
+
+            function pickHandler() {
+                const w = window.pdfjsWorker;
+                return w && w.WorkerMessageHandler ? w.WorkerMessageHandler : null
+            }
+
+            function loadWorkerScriptTag() {
+                return new Promise(res => {
+                    const sc = document.createElement('script');
+                    sc.src = NX_WORKER_SRC;
+                    sc.onload = () => {
+                        sc.remove();
+                        res()
+                    };
+                    sc.onerror = () => {
+                        sc.remove();
+                        res()
+                    };
+                    document.head.appendChild(sc)
+                })
+            }
+            async function loadWorkerByEval() {
+                const r = await fetch(NX_WORKER_SRC, {
+                    cache: 'reload'
+                });
+                if (!r.ok) throw new Error('worker file HTTP ' + r.status);
+                const txt = await r.text();
+                new Function('define', 'exports', 'module', txt).call(window)
+            }
+            async function ensureWorkerHandler() {
+                if (workerHandler) return workerHandler;
+                let h = pickHandler();
+                if (!h) {
+                    await loadWorkerScriptTag();
+                    h = pickHandler()
+                }
+                if (!h) {
+                    try {
+                        await loadWorkerByEval()
+                    } catch (e) {}
+                    h = pickHandler()
+                }
+                if (h) {
+                    workerHandler = h;
+                    try {
+                        delete window.pdfjsWorker
+                    } catch (e) {}
+                    if (window.pdfjsWorker) window.pdfjsWorker = undefined;
+                    try {
+                        Object.defineProperty(window.pdfjsLib.PDFWorker, '_setupFakeWorkerGlobal', {
+                            value: Promise.resolve(h),
+                            configurable: true,
+                            writable: true
+                        })
+                    } catch (e) {}
+                }
+                return h
+            }
 
             function getWorker() {
                 if (!workerPromise) workerPromise = (async () => {
                     try {
-                        if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/js/pdf-worker.js';
-                        const w = new window.pdfjsLib.PDFWorker({
+                        const lib = window.pdfjsLib;
+                        if (lib && lib.GlobalWorkerOptions) lib.GlobalWorkerOptions.workerSrc = NX_WORKER_SRC;
+                        await ensureWorkerHandler();
+                        const w = new lib.PDFWorker({
                             name: 'nexa-pdf'
                         });
                         const to = new Promise((_, no) => setTimeout(() => no(new Error('worker setup timed out')), 20000));
