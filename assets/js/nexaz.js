@@ -6004,6 +6004,7 @@
                 v.task = null;
                 v.mounted = false;
                 v.rs = 0;
+                v.baseRs = 0;
                 v.wrap.classList.remove('ready');
                 v.wrap.replaceChildren();
                 v.base = v.ink = v.objLayer = null;
@@ -6016,6 +6017,19 @@
                 }
             }
             let active = 0;
+            let holdSet = null,
+                holdT = 0;
+            const held = new Map();
+
+            function flushHold(force) {
+                if (!holdSet) return;
+                if (!force && holdSet.size) return;
+                clearTimeout(holdT);
+                const list = [...held.values()];
+                held.clear();
+                holdSet = null;
+                requestAnimationFrame(() => list.forEach(f => f()))
+            }
 
             function enqueue(v) {
                 if (!queue.includes(v)) queue.push(v);
@@ -6073,15 +6087,24 @@
                     v.task = task;
                     await task.promise;
                     if (!v.mounted || tok !== v.tok) return;
-                    v.base.replaceWith(tmp);
-                    v.base = tmp;
-                    const ss = Math.max(1, Math.min(2, 4096 / Math.max(tmp.width, tmp.height), Math.sqrt(16e6 / (tmp.width * tmp.height))));
-                    v.ink.width = Math.ceil(tmp.width * ss);
-                    v.ink.height = Math.ceil(tmp.height * ss);
-                    v.rs = rs * ss;
-                    v.retries = 0;
-                    drawInkAll(v);
-                    v.wrap.classList.add('ready')
+                    const commit = () => {
+                        if (!v.mounted || tok !== v.tok || !v.base || !v.ink) return;
+                        v.base.replaceWith(tmp);
+                        v.base = tmp;
+                        const ss = Math.max(1, Math.min(2, 4096 / Math.max(tmp.width, tmp.height), Math.sqrt(16e6 / (tmp.width * tmp.height))));
+                        v.ink.width = Math.ceil(tmp.width * ss);
+                        v.ink.height = Math.ceil(tmp.height * ss);
+                        v.rs = rs * ss;
+                        v.baseRs = rs;
+                        v.retries = 0;
+                        drawInkAll(v);
+                        v.wrap.classList.add('ready')
+                    };
+                    if (holdSet && holdSet.has(v)) {
+                        held.set(v, commit);
+                        holdSet.delete(v);
+                        flushHold(false)
+                    } else commit()
                 } catch (err) {
                     if (err && err.name === 'RenderingCancelledException') return;
                     if (tok !== v.tok || !v.mounted) return;
@@ -6091,6 +6114,11 @@
                     if (v.retries <= 3) setTimeout(() => {
                         if (v.mounted && tok === v.tok) enqueue(v)
                     }, 600 * v.retries)
+                } finally {
+                    if (holdSet && holdSet.has(v)) {
+                        holdSet.delete(v);
+                        flushHold(false)
+                    }
                 }
             }
 
@@ -6109,9 +6137,26 @@
                 updZoomLabel();
                 clearTimeout(zoomT);
                 zoomT = setTimeout(() => {
-                    views.forEach(v => v.mounted && enqueue(v));
+                    flushHold(true);
+                    const sr = scroller.getBoundingClientRect();
+                    const vis = [],
+                        rest = [];
+                    views.forEach(v => {
+                        if (!v.mounted) return;
+                        const need = v.pw && v.ph ? pickRs(v.pw, v.ph) : 0;
+                        if (v.baseRs && need && need <= v.baseRs * 1.08 && need >= v.baseRs * .45) return;
+                        const r = v.wrap.getBoundingClientRect();
+                        const seen = r.bottom > sr.top && r.top < sr.bottom && v.wrap.classList.contains('ready');
+                        (seen ? vis : rest).push(v)
+                    });
+                    if (vis.length) {
+                        holdSet = new Set(vis);
+                        clearTimeout(holdT);
+                        holdT = setTimeout(() => flushHold(true), 2000)
+                    }
+                    vis.concat(rest).forEach(enqueue);
                     savePos()
-                }, soft ? 120 : 160)
+                }, soft ? 200 : 220)
             }
 
             function fitWidth() {
@@ -6398,6 +6443,51 @@
             scroller.addEventListener('touchend', e => {
                 if (e.touches.length < 2) pinch = null;
                 if (!e.touches.length) touchDown.clear()
+            });
+            const tapSkip = '.pdf-obj, .pdf-obj-bar, .pdf-obj-text, button, input, textarea, select, [contenteditable]';
+            let tapDown = null,
+                tapLast = null;
+
+            function dblZoom(px, py) {
+                if (!pdfDoc || !views.length) return;
+                const f = fitWidth();
+                const ns = scale > f * 1.35 ? f : clamp(Math.max(scale * 2, f * 2), .4, 4);
+                const r = scroller.getBoundingClientRect();
+                const cx = (scroller.scrollLeft + px - r.left) / Math.max(1, scroller.scrollWidth);
+                const cy = (scroller.scrollTop + py - r.top) / Math.max(1, scroller.scrollHeight);
+                setScale(ns);
+                scroller.scrollLeft = cx * scroller.scrollWidth - (px - r.left);
+                scroller.scrollTop = cy * scroller.scrollHeight - (py - r.top)
+            }
+            scroller.addEventListener('pointerdown', e => {
+                tapDown = tool === 'pan' && !sel && e.isPrimary && (e.pointerType !== 'mouse' || e.button === 0) && !(e.target.closest && e.target.closest(tapSkip)) ? {
+                    id: e.pointerId,
+                    x: e.clientX,
+                    y: e.clientY,
+                    t: Date.now()
+                } : null
+            });
+            scroller.addEventListener('pointercancel', () => {
+                tapDown = null;
+                tapLast = null
+            });
+            scroller.addEventListener('pointerup', e => {
+                const d = tapDown;
+                tapDown = null;
+                if (!d || d.id !== e.pointerId || touchDown.size > 1) return;
+                const now = Date.now();
+                if (now - d.t > 350 || Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12) {
+                    tapLast = null;
+                    return
+                }
+                if (tapLast && now - tapLast.t < 380 && Math.hypot(e.clientX - tapLast.x, e.clientY - tapLast.y) < 40) {
+                    tapLast = null;
+                    dblZoom(e.clientX, e.clientY)
+                } else tapLast = {
+                    t: now,
+                    x: e.clientX,
+                    y: e.clientY
+                }
             });
             $('#nr-minus').onclick = () => pdfDoc && setScale(scale / 1.15);
             $('#nr-plus').onclick = () => pdfDoc && setScale(scale * 1.15);
@@ -7801,14 +7891,76 @@
                 return window.NXSTORE.get(id, cb)
             }
             let workerPromise = null;
+            let workerHandler = null;
             const NX_PDF_CMAPS = 'assets/vendor/pdf-cmaps/';
             const NX_PDF_STD_FONTS = 'assets/vendor/pdf-standard-fonts/';
+            const NX_WORKER_SRC = 'assets/js/pdf-worker.js';
+
+            function pickHandler() {
+                const w = window.pdfjsWorker;
+                return w && w.WorkerMessageHandler ? w.WorkerMessageHandler : null
+            }
+
+            function loadWorkerScriptTag() {
+                return new Promise(res => {
+                    const sc = document.createElement('script');
+                    sc.src = NX_WORKER_SRC;
+                    sc.onload = () => {
+                        sc.remove();
+                        res()
+                    };
+                    sc.onerror = () => {
+                        sc.remove();
+                        res()
+                    };
+                    document.head.appendChild(sc)
+                })
+            }
+            async function loadWorkerByEval() {
+                const r = await fetch(NX_WORKER_SRC, {
+                    cache: 'reload'
+                });
+                if (!r.ok) throw new Error('worker file HTTP ' + r.status);
+                const txt = await r.text();
+                new Function('define', 'exports', 'module', txt).call(window)
+            }
+            async function ensureWorkerHandler() {
+                if (workerHandler) return workerHandler;
+                let h = pickHandler();
+                if (!h) {
+                    await loadWorkerScriptTag();
+                    h = pickHandler()
+                }
+                if (!h) {
+                    try {
+                        await loadWorkerByEval()
+                    } catch (e) {}
+                    h = pickHandler()
+                }
+                if (h) {
+                    workerHandler = h;
+                    try {
+                        delete window.pdfjsWorker
+                    } catch (e) {}
+                    if (window.pdfjsWorker) window.pdfjsWorker = undefined;
+                    try {
+                        Object.defineProperty(window.pdfjsLib.PDFWorker, '_setupFakeWorkerGlobal', {
+                            value: Promise.resolve(h),
+                            configurable: true,
+                            writable: true
+                        })
+                    } catch (e) {}
+                }
+                return h
+            }
 
             function getWorker() {
                 if (!workerPromise) workerPromise = (async () => {
                     try {
-                        if (window.pdfjsLib && window.pdfjsLib.GlobalWorkerOptions && !window.pdfjsLib.GlobalWorkerOptions.workerSrc) window.pdfjsLib.GlobalWorkerOptions.workerSrc = 'assets/js/pdf-worker.js';
-                        const w = new window.pdfjsLib.PDFWorker({
+                        const lib = window.pdfjsLib;
+                        if (lib && lib.GlobalWorkerOptions) lib.GlobalWorkerOptions.workerSrc = NX_WORKER_SRC;
+                        await ensureWorkerHandler();
+                        const w = new lib.PDFWorker({
                             name: 'nexa-pdf'
                         });
                         const to = new Promise((_, no) => setTimeout(() => no(new Error('worker setup timed out')), 20000));
@@ -9068,14 +9220,30 @@
                         } else {
                             buildViews();
                             setTool('pan');
-                            reader.classList.remove('nx-loading');
                             if (pos && pos.page > 1) scrollToPage(pos.page);
                             else {
                                 scroller.scrollTop = 0;
                                 $('#nr-page').value = 1
                             }
                             updCurPage();
-                            for (let k = Math.max(0, curPage - 1); k < Math.min(views.length, curPage + 1); k++) mountView(views[k]);
+                            const firstViews = [];
+                            for (let k = Math.max(0, curPage - 1); k < Math.min(views.length, curPage + 1); k++) {
+                                mountView(views[k]);
+                                firstViews.push(views[k])
+                            }
+                            await Promise.all(firstViews.map(v => new Promise(res => {
+                                const t0 = Date.now();
+                                const tick = () => {
+                                    if (myTok !== openTok || v.wrap.classList.contains('ready') || Date.now() - t0 > 20000) {
+                                        res();
+                                        return
+                                    }
+                                    requestAnimationFrame(tick)
+                                };
+                                tick()
+                            })));
+                            if (myTok !== openTok) return;
+                            reader.classList.remove('nx-loading');
                             note('')
                         }
                     } else {
@@ -10237,4 +10405,3 @@
                 lockOff()
             })
         })();
-
