@@ -1,4 +1,4 @@
- ;
+;
         if (window.pdfjsLib) {
             try {
                 pdfjsLib.GlobalWorkerOptions.workerSrc = "assets/js/pdf-worker.js"
@@ -7892,8 +7892,8 @@
             }
             let workerPromise = null;
             let workerHandler = null;
-            const NX_PDF_CMAPS = 'assets/vendor/pdf-cmaps/';
-            const NX_PDF_STD_FONTS = 'assets/vendor/pdf-standard-fonts/';
+            const NX_PDF_CMAPS = new URL('assets/vendor/pdf-cmaps/', document.baseURI).href;
+            const NX_PDF_STD_FONTS = new URL('assets/vendor/pdf-standard-fonts/', document.baseURI).href;
             const NX_WORKER_SRC = 'assets/js/pdf-worker.js';
 
             function pickHandler() {
@@ -10405,4 +10405,3 @@
                 lockOff()
             })
         })();
-
